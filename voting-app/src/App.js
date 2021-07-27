@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { AppBar, Toolbar, Typography } from '@material-ui/core';
 import { TextField, Button, CircularProgress } from '@material-ui/core';
 import { Dialog, DialogTitle, DialogContent, DialogContentText, Snackbar } from '@material-ui/core';
+import { FormControl, FormLabel, RadioGroup, FormControlLabel, Radio } from '@material-ui/core';
 import MuiAlert from '@material-ui/lab/Alert';
 
 import ABI from './abi.json';
@@ -124,7 +125,35 @@ function App() {
 }
 
 function Voting({ contract, account, setOpenSnackbar, setSnackbarMsg }) {
-  console.log(contract);
+
+
+  const [loading, setLoading] = useState([]);
+  const [items, setItems] = useState([]);
+  const [isOwner, setIsOwner] = useState(false);
+  const [selected, setSelected] = useState(0);
+  const [voted, setVoted] = useState(0);
+
+
+  useEffect(() => {
+    setLoading(true);
+    (async () => {
+      let owner = await contract.methods.owner().call();
+      setIsOwner(owner.toLowerCase() === account.toLowerCase());
+      
+      let len = await contract.methods.itemCnt().call();
+      let promises = Array.from({length: len}, (_, i) => contract.methods.voteItems(i).call()
+      );
+      console.log(promises);
+      let result = await Promise.all(promises);
+      console.log(result);
+
+      setLoading(false);
+    })();
+  }, [contract, account]);
+
+  const handleSubmit = () => {};
+
+
   return (
     <>
       <div className="title-div">
@@ -137,6 +166,28 @@ function Voting({ contract, account, setOpenSnackbar, setSnackbarMsg }) {
           </Typography>
         </div>
       </div>
+
+      <div className="title-div">
+        {
+          loading? <CircularProgress />
+          :<div>
+            <RadioGroup aria-label="quiz" name="quiz" value={selected} onChange={(e) => setSelected(e.target.value)}>
+              <FormControlLabel value="best" control={<Radio />} label="The best!" />
+              <FormControlLabel value="worst" control={<Radio />} label="The worst." />
+            </RadioGroup>
+            <Button type="submit" variant="outlined" color="primary">
+              送出
+            </Button>
+          </div>
+        }
+      </div>
+
+      {
+        isOwner && <div>
+          123321
+        </div>
+      }
+
     </>
   )
 }
