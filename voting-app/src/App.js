@@ -53,6 +53,17 @@ function App() {
     window.ethereum.request({ method: "eth_requestAccounts"}) // ethereum.enable() is deprecated
     .then((accounts) => {
       setAccount(accounts[0]);
+
+      const hashChange = () => {
+        if (window.location.hash)
+          setContract(new web3.eth.Contract(ABI, window.location.hash.slice(1)));
+        else
+          setContract(null);
+      }
+      
+      window.addEventListener('hashchange', hashChange);
+      hashChange();
+
       setOpenDialog(false);
     })
     .catch((e) => {
@@ -77,13 +88,15 @@ function App() {
           });
         }
     })
+    
+    
   }, []);
 
   return (
     <div className="App">
       <AppBar>
         <Toolbar>
-          <Link href="." color="inherit">
+          <Link href="#" color="inherit">
             <Typography variant="h5">Decentralized Voting</Typography>
           </Link>
         </Toolbar>
@@ -139,6 +152,8 @@ function Voting({ contract, account, setOpenSnackbar, setSnackbarMsg }) {
   const [newItem, setNewItem] = useState("");
 
   useEffect(() => {
+    window.history.pushState("Voting", "Voting", `#${contract.options.address}`);
+
     setLoading(true);
     (async () => {
       const owner = await contract.methods.owner().call();

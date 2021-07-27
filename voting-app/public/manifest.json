@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Decentralized Voting",
+  "name": "Decentralized voting app",
   "icons": [
     {
       "src": "favicon.ico",
