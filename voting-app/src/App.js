@@ -132,26 +132,35 @@ function Voting({ contract, account, setOpenSnackbar, setSnackbarMsg }) {
   const [isOwner, setIsOwner] = useState(false);
   const [selected, setSelected] = useState(0);
   const [voted, setVoted] = useState(0);
-
+  const [itemLen, setItemLen] = useState(0);
 
   useEffect(() => {
     setLoading(true);
     (async () => {
       let owner = await contract.methods.owner().call();
       setIsOwner(owner.toLowerCase() === account.toLowerCase());
-      
       let len = await contract.methods.itemCnt().call();
-      let promises = Array.from({length: len}, (_, i) => contract.methods.voteItems(i).call()
+      setItemLen(len);
+      console.log(len)
+      let promises = Array.from({ length: len }, (_, i) => contract.methods.voteItems(i).call()
       );
       console.log(promises);
       let result = await Promise.all(promises);
       console.log(result);
-
       setLoading(false);
+      setItems(result)
     })();
   }, [contract, account]);
 
-  const handleSubmit = () => {};
+  const handleSubmit = () => {
+    console.log(selected)
+    window.ethereum.request({ method: 'eth_accounts' })
+    .then((accounts) => {
+        if (accounts.length) {
+          contract.methods.vote(selected).send({from:accounts[0]});
+        }
+    })
+  };
 
 
   return (
@@ -171,11 +180,10 @@ function Voting({ contract, account, setOpenSnackbar, setSnackbarMsg }) {
         {
           loading? <CircularProgress />
           :<div>
-            <RadioGroup aria-label="quiz" name="quiz" value={selected} onChange={(e) => setSelected(e.target.value)}>
-              <FormControlLabel value="best" control={<Radio />} label="The best!" />
-              <FormControlLabel value="worst" control={<Radio />} label="The worst." />
+              <RadioGroup aria-label="quiz" name="quiz" value={selected} onChange={(e) => setSelected(parseInt(e.target.value))}>
+                {items.map((item, id) => <FormControlLabel key={id} value={id} control={<Radio />} label={item[0]} />)}
             </RadioGroup>
-            <Button type="submit" variant="outlined" color="primary">
+              <Button type="submit" variant="outlined" color="primary" onClick={handleSubmit}>
               送出
             </Button>
           </div>
