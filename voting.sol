@@ -25,9 +25,10 @@ contract Voting {
     }
     
     event voteChanged(uint256 idx);
+    event pollClosed();
     
     function vote(uint256 idx) public {
-        require(!closed, "The voting is closed!");
+        require(!closed, "The poll is closed!");
         require(!voted[msg.sender], "You have already voted!");
         require(idx < voteItems.length, "Invalid index!");
         
@@ -37,13 +38,14 @@ contract Voting {
     }
     
     function close() isOwner public {
-        require(!closed, "The voting is already closed!");
+        require(!closed, "The poll is already closed!");
         closed = true;
+        emit pollClosed();
     }
     
     function addItem(string memory name) isOwner public {
         voteItems.push(Item(name, 0));
-        emit voteChanged(voteItems.length);
+        emit voteChanged(voteItems.length - 1);
     }
     
     function itemCnt() public view returns (uint256) {

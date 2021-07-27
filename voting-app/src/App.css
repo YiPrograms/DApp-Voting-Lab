@@ -38,13 +38,10 @@
 }
 
 
-.title-div {
+.section {
   padding: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-#address-input {
-  margin-right: 20px;
-}

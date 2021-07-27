@@ -2,10 +2,11 @@ import './App.css';
 
 import React, { useState, useEffect } from 'react';
 
-import { AppBar, Toolbar, Typography } from '@material-ui/core';
+import { AppBar, Link, Toolbar, Typography } from '@material-ui/core';
 import { TextField, Button, CircularProgress } from '@material-ui/core';
 import { Dialog, DialogTitle, DialogContent, DialogContentText, Snackbar } from '@material-ui/core';
-import { FormControl, FormLabel, RadioGroup, FormControlLabel, Radio } from '@material-ui/core';
+import { RadioGroup, FormControlLabel, Radio } from '@material-ui/core';
+import { DataGrid } from '@material-ui/data-grid';
 import MuiAlert from '@material-ui/lab/Alert';
 
 import ABI from './abi.json';
@@ -62,7 +63,7 @@ function App() {
               title: "Please connect to MetaMask!",
               body:
                 <>
-                  You rejected the connection! <br />
+                  You rejected the connection! <br/>
                   Refresh the page to continue
                 </>
             });
@@ -82,7 +83,9 @@ function App() {
     <div className="App">
       <AppBar>
         <Toolbar>
-          <Typography variant="h5">Decentralized Voting</Typography>
+          <Link href="." color="inherit">
+            <Typography variant="h5">Decentralized Voting</Typography>
+          </Link>
         </Toolbar>
       </AppBar>
       <Toolbar />
@@ -94,7 +97,7 @@ function App() {
             setContract={setContract}
             account={account}
             setOpenSnackbar={setOpenSnackbar}
-            setSnackbarMsg={setSnackbarMsg} />
+            setSnackbarMsg={setSnackbarMsg}/>
           :<Voting
             contract={contract}
             account={account}
@@ -126,76 +129,202 @@ function App() {
 
 function Voting({ contract, account, setOpenSnackbar, setSnackbarMsg }) {
 
-
-  const [loading, setLoading] = useState([]);
   const [items, setItems] = useState([]);
   const [isOwner, setIsOwner] = useState(false);
+  const [voted, setVoted] = useState(false);
+  const [closed, setClosed] = useState(false);
+
+  const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(0);
-  const [voted, setVoted] = useState(0);
-  const [itemLen, setItemLen] = useState(0);
+  const [newItem, setNewItem] = useState("");
 
   useEffect(() => {
     setLoading(true);
     (async () => {
-      let owner = await contract.methods.owner().call();
+      const owner = await contract.methods.owner().call();
       setIsOwner(owner.toLowerCase() === account.toLowerCase());
-      let len = await contract.methods.itemCnt().call();
-      setItemLen(len);
-      console.log(len)
-      let promises = Array.from({ length: len }, (_, i) => contract.methods.voteItems(i).call()
+
+      const len = await contract.methods.itemCnt().call();
+      const promises = Array.from(
+        { length: len },
+        (_, i) => contract.methods.voteItems(i).call()
       );
-      console.log(promises);
-      let result = await Promise.all(promises);
+      const result = await Promise.all(promises);
+      result.forEach((item, i) => item.id = i);
       console.log(result);
+      setItems(result);
+
+      contract.events.voteChanged({}, async (_, event) => {
+        const idx = event.returnValues.idx;
+        console.log(idx);
+        let item = await contract.methods.voteItems(idx).call();
+        item.id = idx;
+        setItems(items => {
+          const newItems = items.slice();
+          newItems.splice(idx, 1, item);
+          return newItems;
+        });
+      });
+
+      const voted = await contract.methods.voted(account).call();
+      setVoted(voted);
+
+      const closed = await contract.methods.closed().call();
+      setClosed(closed);
+
+      contract.events.pollClosed({}, async (_, event) => {
+        setClosed(true);
+      });
+
+
       setLoading(false);
-      setItems(result)
     })();
   }, [contract, account]);
 
-  const handleSubmit = () => {
-    console.log(selected)
-    window.ethereum.request({ method: 'eth_accounts' })
-    .then((accounts) => {
-        if (accounts.length) {
-          contract.methods.vote(selected).send({from:accounts[0]});
-        }
-    })
+  const sendVote = async () => {
+    setLoading(true);
+    console.log(selected);
+
+    await contract.methods.vote(selected).send({
+      from: account,
+    }).on('error', (e) => {
+      setSnackbarMsg(e.message);
+      setOpenSnackbar(true);
+    }).then((receipt) => {
+      console.log(receipt);
+      setVoted(true);
+    });
+
+    setLoading(false);
+  };
+
+  const sendNewItem = async () => {
+    await contract.methods.addItem(newItem).send({
+      from: account,
+    }).on('confirmation', (e) => {
+      setNewItem("");
+    }).on('error', (e) => {
+      setSnackbarMsg(e.message);
+      setOpenSnackbar(true);
+    }).then((receipt) => {
+      console.log(receipt);
+    });
+  };
+
+  const closeVoting = async () => {
+    setLoading(true);
+
+    await contract.methods.close().send({
+      from: account,
+    }).on('error', (e) => {
+      setSnackbarMsg(e.message);
+      setOpenSnackbar(true);
+    }).then((receipt) => {
+      console.log(receipt);
+      setClosed(true);
+    });
+
+    setLoading(false);
   };
 
 
   return (
     <>
-      <div className="title-div">
+      <div className="section">
         <div>
           <Typography variant="h6">
-              Your Contract
+            Current Contract
           </Typography>
           <Typography variant="h4">
             {contract.options.address}
           </Typography>
+          <Typography variant="h6">
+            {
+              loading?
+                "Loading..."
+              :
+                closed?
+                  "The poll is closed, showing the final results"
+                :
+                  voted?
+                    <>
+                      You have already voted <br/>
+                      The poll is still open, updating results dynamically
+                    </>
+                  :
+                    "Please choose an item to vote!"
+            }
+          </Typography>
         </div>
-      </div>
-
-      <div className="title-div">
-        {
-          loading? <CircularProgress />
-          :<div>
-              <RadioGroup aria-label="quiz" name="quiz" value={selected} onChange={(e) => setSelected(parseInt(e.target.value))}>
-                {items.map((item, id) => <FormControlLabel key={id} value={id} control={<Radio />} label={item[0]} />)}
-            </RadioGroup>
-              <Button type="submit" variant="outlined" color="primary" onClick={handleSubmit}>
-              送出
-            </Button>
-          </div>
-        }
       </div>
 
       {
-        isOwner && <div>
-          123321
-        </div>
-      }
+        loading? 
+          <CircularProgress />
+        :
+        <>
+          {
+            (!voted && !closed) && 
+              <div className="section">
+                <div>
+                  <RadioGroup value={selected} onChange={(e) => setSelected(parseInt(e.target.value))}>
+                    {
+                      items.map((item, id) =>
+                          <FormControlLabel key={id} value={id} control={<Radio />} label={item.name} />
+                      )
+                    }
+                  </RadioGroup>
+                  <Button variant="outlined" color="primary" style={{marginTop: 16}} onClick={sendVote}>
+                    Vote!
+                  </Button>
+                </div>
+              </div>
+          }
 
+          {
+            (voted || closed || isOwner) &&
+              <div className="section">
+                <div style={{ height: 400, width: 1000 }}>
+                  <DataGrid
+                    columns={[
+                      { field: 'id', headerName: 'ID', width: 200 },
+                      { field: 'name', headerName: 'Name', width: 500 },
+                      { field: 'votes', headerName: 'Votes', width: 300 },
+                    ]}
+                    rows={items}
+                    disableSelectionOnClick
+                  />
+                </div>
+              </div>
+          }
+
+          {
+            (isOwner && !closed) &&
+              <div className="section">
+                <TextField
+                  style={{marginRight: 16}}
+                  label="New Item"
+                  value={newItem}
+                  onChange={(e) => setNewItem(e.target.value)} />
+                <Button
+                  style={{marginRight: 16}}
+                  variant="contained"
+                  color="primary"
+                  onClick={sendNewItem}
+                  disabled={loading}>
+                    Add
+                </Button>
+                <Button
+                  variant="contained"
+                  color="secondary"
+                  onClick={closeVoting}
+                  disabled={loading}>
+                    Close Voting
+                </Button>
+              </div>
+          }
+        </>
+      }
     </>
   )
 }
@@ -216,7 +345,7 @@ function Setup({ setContract, account, setOpenSnackbar, setSnackbarMsg }) {
     votingContract.deploy({
       data: Bytecode.object, 
     }).send({
-        from: account, 
+      from: account, 
     }).on('error', (e) => {
       setSnackbarMsg(e.message);
       setOpenSnackbar(true);
@@ -229,7 +358,7 @@ function Setup({ setContract, account, setOpenSnackbar, setSnackbarMsg }) {
 
   return(
     <>
-      <div className="title-div">
+      <div className="section">
         <TextField
           style={{marginRight: 16}}
           label="Contract Address (0x...)"
@@ -240,11 +369,11 @@ function Setup({ setContract, account, setOpenSnackbar, setSnackbarMsg }) {
           color="primary"
           onClick={connectContract}
           disabled={loading}>
-            Connect
+            Enter
         </Button>
       </div>
       Or...
-      <div className="title-div">
+      <div className="section">
         {
           loading?
             <CircularProgress/>:
@@ -252,7 +381,7 @@ function Setup({ setContract, account, setOpenSnackbar, setSnackbarMsg }) {
               variant="contained"
               color="secondary"
               onClick={deployNewContract}>
-                Create new voting
+                Create a new poll
             </Button>
         }
       </div>

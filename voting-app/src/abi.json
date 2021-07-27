@@ -6,6 +6,12 @@
 	},
 	{
 		"anonymous": false,
+		"inputs": [],
+		"name": "pollClosed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
 		"inputs": [
 			{
 				"indexed": false,
