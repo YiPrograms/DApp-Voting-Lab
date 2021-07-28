@@ -121,7 +121,6 @@ function App() {
       {
         contract == null? 
           <Setup
-            setContract={setContract}
             account={account}
             setOpenSnackbar={setOpenSnackbar}
             setSnackbarMsg={setSnackbarMsg}/>
@@ -358,7 +357,7 @@ function Voting({ contract, account, setOpenSnackbar, setSnackbarMsg }) {
   )
 }
 
-function Setup({ setContract, account, setOpenSnackbar, setSnackbarMsg }) {
+function Setup({ account, setOpenSnackbar, setSnackbarMsg }) {
   const [loading, setLoading] = useState(false);
   const [contractInput, setContractInput] = useState("");
  
@@ -369,17 +368,16 @@ function Setup({ setContract, account, setOpenSnackbar, setSnackbarMsg }) {
   const deployNewContract = async () => {
     setLoading(true);
 
-    await factory.methods.newContract().send({
+    factory.methods.newContract().send({
       from: account,
     }).on('error', (e) => {
       setSnackbarMsg(e.message);
       setOpenSnackbar(true);
+      setLoading(false);
     }).then((receipt) => {
       console.log(receipt);
       window.location.hash = receipt.events.contractCreated.returnValues.addr;
     });
-
-    setLoading(false);
   }
 
   return(
