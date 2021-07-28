@@ -9,11 +9,14 @@ import { RadioGroup, FormControlLabel, Radio } from '@material-ui/core';
 import { DataGrid } from '@material-ui/data-grid';
 import MuiAlert from '@material-ui/lab/Alert';
 
-import ABI from './abi.json';
-import Bytecode from './bytecode.json';
+import VotingABI from './VotingABI.json';
+import FactoryABI from './FactoryABI.json';
+
+const factoryAddress = "0x1043cAb65ba94E257B0a54eeECF93d47aAB3DA3f";
 
 var Web3 = require('web3');
 var web3;
+var factory;
 
 function App() {
 
@@ -54,11 +57,22 @@ function App() {
     .then((accounts) => {
       setAccount(accounts[0]);
 
-      const hashChange = () => {
-        if (window.location.hash)
-          setContract(new web3.eth.Contract(ABI, window.location.hash.slice(1)));
-        else
+      factory = new web3.eth.Contract(FactoryABI, factoryAddress);
+
+      const hashChange = async () => {
+        if (window.location.hash) {
+          const addr = window.location.hash.slice(1);
+          const valid = web3.utils.isAddress(addr) && await factory.methods.isValid(addr).call();
+          if (!valid) {
+            window.location.hash = "#";
+            setSnackbarMsg("The contract address is invalid!");
+            setOpenSnackbar(true);
+          } else {
+            setContract(new web3.eth.Contract(VotingABI, addr));
+          }
+        } else {
           setContract(null);
+        }
       }
       
       window.addEventListener('hashchange', hashChange);
@@ -349,26 +363,23 @@ function Setup({ setContract, account, setOpenSnackbar, setSnackbarMsg }) {
   const [contractInput, setContractInput] = useState("");
  
   const connectContract = () => {
-    var votingContract = new web3.eth.Contract(ABI, contractInput);
-    setContract(votingContract);
+    window.location.hash = contractInput;
   }
 
-  const deployNewContract = () => {
+  const deployNewContract = async () => {
     setLoading(true);
 
-    var votingContract = new web3.eth.Contract(ABI);
-    votingContract.deploy({
-      data: Bytecode.object, 
-    }).send({
-      from: account, 
+    await factory.methods.newContract().send({
+      from: account,
     }).on('error', (e) => {
       setSnackbarMsg(e.message);
       setOpenSnackbar(true);
-      setLoading(false);
-    }).then((contract) => {
-      console.log(contract);
-      setContract(contract);
+    }).then((receipt) => {
+      console.log(receipt);
+      window.location.hash = receipt.events.contractCreated.returnValues.addr;
     });
+
+    setLoading(false);
   }
 
   return(
