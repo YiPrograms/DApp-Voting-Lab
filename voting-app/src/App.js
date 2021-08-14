@@ -57,6 +57,18 @@ function App() {
     .then((accounts) => {
       setAccount(accounts[0]);
 
+      if (window.ethereum.chainId != 4) {
+        setMessage({
+          title: "Please connect to the Rinkeby Testnet!",
+          body:
+            <>
+              Change the network in MetaMask! <br/>
+              Refresh the page to continue
+            </>
+        });
+        return;
+      }
+
       factory = new web3.eth.Contract(FactoryABI, factoryAddress);
 
       const hashChange = async () => {
